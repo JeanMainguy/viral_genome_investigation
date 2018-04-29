@@ -1,7 +1,7 @@
 library(ggplot2)
 library(scales)
 
-data = read.csv("../result/polyproteins_interpro_domains.csv", header = TRUE, sep = "\t", stringsAsFactors = FALSE)
+data = read.csv("result/polyproteins_interpro_domains.csv", header = TRUE, sep = "\t", stringsAsFactors = FALSE)
 
 overlap_data = data[data$overflow == 'True', ]
 overlap_data = overlap_data[overlap_data$Expected_peptides_number == 'True', ]
@@ -15,25 +15,25 @@ overlap_database = data.frame( table(overlap_data$groupedby5, overlap_data$app))
 colnames(overlap_database) = c("overlap", "method", "Nb_domains")
 
 p<-ggplot(data=overlap_database, aes(x=overlap, y=Nb_domains)) +
-  geom_bar(stat="identity",fill = "#f28759") + theme_minimal() + 
+  geom_bar(stat="identity",fill = "#f28759") + theme_minimal() +
   theme(axis.text.x = element_text(angle = 90, size=15, vjust=0.5, hjust=1),
         axis.text.y = element_text(size=15), axis.title=element_text(size=15,face="bold")) +
   labs( y="Number of domain annotations", x="Overlap distance (amino acid)")+
   scale_fill_manual(values=c("red"))
 
-png(filename="../Figures/Overlap_distance_of_domain_annotation",  width = 700, height = 500)
+png(filename="Figures/Overlap_distance_of_domain_annotation",  width = 700, height = 500)
 p
 dev.off()
 
 #COLOR BY DATABASE
 p<-ggplot(data=overlap_database, aes(x=overlap, y=Nb_domains, fill=reorder(method, Nb_domains))) +
-  geom_bar(stat="identity") +  theme_minimal() + 
+  geom_bar(stat="identity") +  theme_minimal() +
   theme(axis.text.x = element_text(angle = 90, size=15, vjust=0.5, hjust=1),
-        axis.text.y = element_text(size=15), axis.title=element_text(size=15,face="bold"), 
+        axis.text.y = element_text(size=15), axis.title=element_text(size=15,face="bold"),
         legend.text = element_text( size=15), legend.title = element_text(size=15, face='bold')) +
   labs( y="Number of domain annotations", fill="Interpro Database:", x="Overlap distance (amino acid)")
 
-png(filename="../Figures/Overlap_distance_by_database",  width = 700, height = 500)
+png(filename="Figures/Overlap_distance_by_database",  width = 700, height = 500)
 p
 dev.off()
 
@@ -51,14 +51,14 @@ colnames(domain_annotations_data) = c("overlap", "Domain", "Nb_domains")
 domain_annotations_data = rev(domain_annotations_data)
 
 p<-ggplot(data=domain_annotations_data, aes(x=overlap, y=Nb_domains, fill=Domain)) +
-  geom_bar(stat="identity") +  theme_minimal() + 
+  geom_bar(stat="identity") +  theme_minimal() +
   theme(axis.text.x = element_text(angle = 90, size=15, vjust=0.5, hjust=1),
-        axis.text.y = element_text(size=15), axis.title=element_text(size=15,face="bold"), 
+        axis.text.y = element_text(size=15), axis.title=element_text(size=15,face="bold"),
         legend.text = element_text( size=15), legend.title = element_text(size=15, face='bold')) +
   labs( y="Number of domain annotations", fill="Domain Name:", x="Overlap distance (amino acid)") +
  scale_fill_manual(values=c("#999999", hue_pal()(21)))
 p
 
-png(filename="../Figures/Overlap_distance_by_domain_name",  width = 700, height = 500)
+png(filename="Figures/Overlap_distance_by_domain_name",  width = 700, height = 500)
 p
 dev.off()
