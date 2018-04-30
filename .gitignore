@@ -1,3 +1,5 @@
 *.pyc
 **/__*__
-*_OLD* 
+*_OLD*
+.old
+*test.py 
