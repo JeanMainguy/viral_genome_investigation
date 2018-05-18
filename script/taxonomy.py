@@ -1,7 +1,7 @@
 import os
 import logging
 import re
-import gzip
+import gzip, csv
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
 from Bio.Seq import Seq
@@ -130,7 +130,7 @@ def getAllRefseqFromTaxon(wanted_taxonomy, taxonomy_file="data/taxonomy/taxonomy
             # print(taxonomy)
             if wanted_taxonomy in taxonomy.split(';'):
                 # print('taxonomy')
-                yield {'gb_file':gbff.rstrip(), 'genetic_code': genetic_code}
+                yield {'gb_file':gbff.rstrip(), 'genetic_code': genetic_code, 'taxon_id':tax_id}
 
             if tax_id == wanted_taxonomy or organism == wanted_taxonomy:
                 yield {'gb_file':gbff.rstrip(), 'genetic_code': genetic_code}
@@ -139,18 +139,27 @@ def getAllRefseqFromTaxon(wanted_taxonomy, taxonomy_file="data/taxonomy/taxonomy
 def expectedPeptide(expected_pep_file):
 
         taxon_expectation = {}
-        nb_correct_poly = 0
         with open(expected_pep_file, "r", newline='') as fl:
+            reader = csv.DictReader(fl, delimiter='\t')
+            for row in reader:
+                row = dict(row)
+                #conversion in int
+                for key in row:
+                    if key == 'taxon':
+                        taxon = row[key]
+                        continue
+                    row[key] = None if not row[key] else int(row[key])
 
-
-            for l in fl:
-                if l.startswith('#'):
-                    continue
-                (taxon, polyprotein, expected_peptide) = l.split("\t")
-                expected_peptide = int(expected_peptide)
-                polyprotein = None if not polyprotein else int(polyprotein)
-                if expected_peptide > 0:
-                    taxon_expectation[taxon] = {"polyprotein":polyprotein, "peptide":expected_peptide}
+                if row["peptide"] > 0:
+                    taxon_expectation[taxon] = row
+                # print(row['first_name'], row['last_name'])
+            #
+            # for l in fl:
+            #     line_elements = l.split("\t")
+            #     expected_peptide = int(expected_peptide)
+            #     polyprotein = None if not polyprotein else int(polyprotein)
+            #     if expected_peptide > 0:
+            #         taxon_expectation[taxon] = {"polyprotein":polyprotein, "peptide":expected_peptide}
         return taxon_expectation
 
 def getGeneticCode(viral_taxons, geneticcode_file, tmp_output_file, output_file):
