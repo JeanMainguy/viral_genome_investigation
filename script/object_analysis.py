@@ -10,7 +10,7 @@ from Bio.Alphabet import generic_protein
 from Bio.SeqFeature import SeqFeature, FeatureLocation
 from operator import attrgetter
 
-SCREEN_SIZE = 205
+SCREEN_SIZE = 140
 
 
 class Genome:
@@ -566,11 +566,6 @@ class Segment:
                     # self.polyproteins.add(cds)
                     cds.peptides.add(pep)
                     pep.polyproteins.add(cds)
-
-
-                    # print('cds', cds.bp_obj.location)
-                    # print(len(cds.bp_obj))
-                    # print("poly", pep.bp_obj)
             if cds.peptides:
                 cds.reasons.add('has mature peptide annotation')
                 cds.status = 'Polyprotein'
@@ -805,9 +800,6 @@ class Segment:
                     m.left_overlaps_peptide = pep_start - m.start_in_prot
 
 
-
-
-
     def identifyDuplicatedMatch(self):
         # Due to ribosomal_slippage 2 proteins have been given to interpro but they share a similar part and then may share same somain
         # To not count twice this domain we identify the domain that have the same start and end in the genome and have same name
@@ -1014,27 +1006,64 @@ class Protein(Sequence):
     def polyproteinCoverage(self):
         ##Check if the mat peptide associated with the protein are covering all the prot or not
         #If not create unannotated_region to fill the gaps
-        unannotated_region = []
-        current_po = 1
+        unannotated_position = []
+
         self.unannotated_len = 0
-        # pep_position = [(pep.qualifiers['start_aa'], pep.qualifiers['end_aa']) for pep in peptides] # if "parent_peptide" not in pep.qualifiers].sort()
-        for pep in sorted(list(self.peptides), key=lambda x: x.bp_obj.location.start, reverse=False) :
-            start, end = pep.get_position_prot_relative(self)
-            if start > current_po: # if start is beyond the current positon
-                unannotated_seq = UnannotatedRegion(current_po, start-1, self) #SeqFeature(FeatureLocation(current_po-1, start-1-1), type="unannotated_region", qualifiers={'note':'Position given in amino acid', "start_aa":current_po-1, 'end_aa':start-1-1})
-                # unannotated_seq = Peptide(unannotated_seq_feature)
+        iter_parts = iter(self.bp_obj.location.parts)
+        protpart = next(iter_parts)
+        current_po = protpart.start
+        partial_location = None
+        for pep in sorted(list(self.peptides), key=lambda x: x.start, reverse=False) :
+            # start, end = pep.start, pep.end
+
+            if current_po < pep.start: # if pep start is after the current positon then a unnatotade region need to be created
+                #UnannotatedRegion(current_po, start-1, self) #SeqFeature(FeatureLocation(current_po-1, start-1-1), type="unannotated_region", qualifiers={'note':'Position given in amino acid', "start_aa":current_po-1, 'end_aa':start-1-1})
+
+                if protpart.end < pep.start: #that means the next peptideb start is located in the next part of the protein
+
+                    location = FeatureLocation(current_po, protpart.end)
+                    partial_location = partial_location + location if partial_location else location
+
+                    protpart = next(iter_parts)
+                    current_po = protpart.start
+                else:
+                    #a unnatotade position is created.
+                    location =  FeatureLocation(current_po, pep.start)
+                    if partial_location:
+                        location = partial_location + location
+                    unannotated_seq = UnannotatedRegion(location, self)
+                    current_po = pep.end
+                    self.unannotated_region.append(unannotated_seq)
+            elif current_po < pep.end:
+                if protpart.end < pep.end: #the peptide is overlapping two part of the prot
+                    protpart = next(iter_parts) # we take the next part
+
+                current_po = pep.end
+
+            # else: #Another case where curent_po > pep.end but then we don't change the current po and we move to the next pep
+            #     current_po =  current_po
+
+
+        if current_po < protpart.end: # we didn't not arrive at the end of the
+            location = FeatureLocation(current_po, protpart.end)
+            final_location = partial_location + location if partial_location else location
+            current_po = protpart.end
+            for protpart in iter_parts:
+                print(protpart)
+                final_location += FeatureLocation(current_po, protpart.end)
+                current_po = protpart.end
+
+            if len(final_location) > 3:
+                unannotated_seq = UnannotatedRegion(final_location, self)
+
                 self.unannotated_region.append(unannotated_seq)
-                self.unannotated_len += start - current_po # nex peptide start -1 - current_po +1
-            current_po = end+1 if end +1 > current_po else current_po
-
-
-        if current_po < len(self.bp_obj)/3 -1: # the stop codon is take into account in the len of the prot so -1
-            unannotated_seq = UnannotatedRegion(current_po, int(len(self.bp_obj)/3 -1), self) #SeqFeature(FeatureLocation(current_po, int(len(self.bp_obj)/3 -1)), type="unannotated_region", qualifiers={'note':'Position given in amino acid', "start_aa":current_po-1, 'end_aa':int(len(self.bp_obj)/3 -1-1)})
+            # unannotated_seq = UnannotatedRegion(current_po, int(len(self.bp_obj)/3 -1), self) #SeqFeature(FeatureLocation(current_po, int(len(self.bp_obj)/3 -1)), type="unannotated_region", qualifiers={'note':'Position given in amino acid', "start_aa":current_po-1, 'end_aa':int(len(self.bp_obj)/3 -1-1)})
             # unannotated_seq = Peptide(unannotated_seq_feature)
-            self.unannotated_region.append(unannotated_seq)
-            self.unannotated_len += len(self.bp_obj)/3 - current_po
+
+            # self.unannotated_len += len(self.bp_obj)/3 - current_po
         # poly.qualifiers['unannotated_region'] = unannotated_region
         # poly.qualifiers['peptide_coverage'] = len(poly)/3 - unannotated_len -1 # -1 because we dont count the stop codon
+        print(unannotated_position)
 
 
     def isIncludedIn(self, poly_next):
@@ -1091,7 +1120,7 @@ class Peptide(Sequence):
     def __str__(self):
 
         string = 'Peptide {}: from {} to {} | belongs to {}\n'.format(self.number, self.start,self.end, [prot.number for prot in self.polyproteins])
-        string += str(len(self))+' nt \n'
+        string += '{} nt| location :{}  \n'.format(len(self), self.bp_obj.location)
         string += '  Position in protein\n'
         for prot in self.polyproteins:
             string += '    protein {} from {} to {}\n'.format(prot.number, self.start_aa(prot), self.end_aa(prot))
@@ -1100,8 +1129,6 @@ class Peptide(Sequence):
 
 
     def start_aa(self, prot):
-        if self.__class__.__name__ ==  'UnannotatedRegion':
-            return self.start_in_prot
         if prot.protein_id not in self.position_prot_relative:
             self.getProteinPosition(prot)
 
@@ -1109,8 +1136,6 @@ class Peptide(Sequence):
 
 
     def end_aa(self, prot):
-        if self.__class__.__name__ ==  'UnannotatedRegion':
-            return self.end_in_prot
 
         if prot.protein_id not in self.position_prot_relative:
             self.getProteinPosition(prot)
@@ -1148,20 +1173,20 @@ class Peptide(Sequence):
         return str(self.number)
 
 
-
 class UnannotatedRegion(Peptide):
 
-    def __init__(self, start_in_prot, end_in_prot, protein):
-        self.start_in_prot =  start_in_prot
-        self.end_in_prot   = end_in_prot
+    def __init__(self, location, protein):
+        self.start =  location.start
+        self.end   = location.end
         self.polyproteins = [protein] # this region belongs to this protein
-        self.getGenomicPositions(protein.start) #give start and end attr
+
         self.non_overlapping_prot = set()
         self.position_prot_relative = {}
+
         Peptide.COUNTER +=1
         self.number = Peptide.COUNTER
 
-        self.bp_obj = SeqFeature(FeatureLocation(self.start, self.end),
+        self.bp_obj = SeqFeature(location,
             type="unannotated_region",
             qualifiers={})
 
