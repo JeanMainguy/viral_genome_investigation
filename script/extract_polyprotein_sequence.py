@@ -12,7 +12,7 @@ from operator import attrgetter
 
 
 
-def extractCleavageSites(gb_file,dico_file, genetic_code, gff_file, taxon_expectation, polyprotein_number):
+def extractProteins(gb_file, handle_poly, handle_prot, genetic_code):
 
 
     genome = obj.Genome( gb_file)
@@ -25,6 +25,9 @@ def extractCleavageSites(gb_file,dico_file, genetic_code, gff_file, taxon_expect
             genome.segments.append(segment)
 
             segment.getMatpeptidesAndPolyproteins()
+            if not segment.peptides:
+                continue
+
             segment.checkPeptideRedundancy() #remove the redundant peptide
             segment.checkSubPeptides()
             segment.associatePepWithProt()
@@ -34,88 +37,59 @@ def extractCleavageSites(gb_file,dico_file, genetic_code, gff_file, taxon_expect
 
             segment.getCleavageSites()
 
-            # segment.writeCleavageSite(file_handle, genetic_code, window_step)
 
-    genome.getTaxonExpectation(taxon_expectation)
-
-    genome.identifyExpectedElement()
-
-    genome.getMatchObject(gff_file)
-    genome.associateMatchWithPolyprotein()
 
     # genome.visualisation(1, genetic_code)
-    if not genome.polyprotein_expectation:
-        print("NO POLYPROTEIN NUMBER FOR: ",genome.expectation_node+'|'+genome.organism)
-        input()
-    header_info = genome.expectation_node+'|'+genome.taxon_id
-    print(header_info)
+    print(segment.taxon_id)
     for i, segment in enumerate(genome.segments):
-        for cds in segment.cds:
+        header_info = segment.taxon_id
 
-            if cds.polyprotein_number: # == polyprotein_number and i+1 == wanted_segment:
-                key = '{}_{}'.format(i+1, cds.polyprotein_number) # first segment and then the polyprotein number
-                if key not in dico_file:
-                    file_name = '{}_{}.faa'.format(dico_file["prefix_file"],key)
-                    print(file_name)
+        for p, cds in enumerate(segment.cds):
+            # for pep in cds.peptides:
+            #     print(pep)
+            key = '{}_{}'.format(i+1, p+1) # first segment and then the polyprotein number
 
-                    dico_file[key] = open(file_name, "w")
-                # header_info += '|annotation' if .segments else '|no_annotation'
+            # header_info += '|annotation' if .segments else '|no_annotation'
 
-                seq_to_write = cds.getSequenceRecord(segment.organism, header_info, segment.record, genetic_code)
-                SeqIO.write(seq_to_write, dico_file[key] ,"fasta")
+            header = '|'.join([header_info, cds.protein_id, key])
 
+            seq_to_write = cds.getSequenceRecord(segment.organism, header, segment.record, genetic_code)
 
+            SeqIO.write(seq_to_write, handle_prot,"fasta")
 
-def polyproteinsFileExist(taxon, output_dir):
-    for file in os.listdir(output_dir):
-        if file.startswith(taxon):
-            return True
-    return False
+            if cds.peptides:
+                SeqIO.write(seq_to_write, handle_poly,"fasta")
+
 
 if __name__ == '__main__':
 
     # logging.basicConfig(filename='log/genbankparser.log',level=logging.INFO)
-    polyprotein_number = 1.0
+    try:
+        taxon = sys.argv[1]
+    except IndexError:
+        taxon = "Viruses"
 
     taxonomy_file="data/taxonomy/taxonomy_virus.txt"
-    expected_file =  "data/taxonomy/polyprotein_expectation_by_taxon.csv"
 
-    output_dir = '/home/user/mainguy/Documents/Data_Analysis/data/polyprotein'
-    gff_file = 'data/interproscan_result/annotated_polyprotein_by_taxon/polyprotein_All.gff3'
+    output_dir = 'data/polyprotein_sequence'
 
+    polyprotein_db = '{}_polyprotein_db.faa'.format(taxon)
+    protein_db = "{}_protein_db.faa".format(taxon)
 
+    handle_poly = open(os.path.join(output_dir,polyprotein_db), "w")
+    handle_prot = open(os.path.join(output_dir,protein_db), "w")
 
+    gbff_iter = tax.getAllRefseqFromTaxon(taxon, taxonomy_file)
 
+    for i, gb_dico in enumerate(gbff_iter):
+        # print(gb_dico)
+        gb_file = gb_dico['gb_file']
+        genetic_code = gb_dico['genetic_code']
+        # print(gb_file)
+        extractProteins(gb_file, handle_poly, handle_prot, genetic_code)
+        if i%100 == 0:
+            print(i)
+    print('Polyproteins extraction completed for taxon', taxon)
 
-
-    taxon_expectation = tax.expectedPeptide(expected_file)
-
-    for taxon in taxon_expectation:
-
-        if not taxon_expectation[taxon]['polyprotein']:
-            logging.info('Information about {} are not complete in the expectation file: {}. Polyprotein are then not extracted'.format(taxon, expected_file))
-            continue
-        if polyproteinsFileExist(taxon, output_dir):
-            logging.warning('polyproteins from {} have been already extracted'.format(taxon))
-            # continue
-        taxon= "12139"
-        prefix_file = os.path.join(output_dir,'{}_polyprotein'.format(taxon))
-
-        dico_file = {'prefix_file':prefix_file}
-
-        gbff_iter = tax.getAllRefseqFromTaxon(taxon, taxonomy_file)
-
-
-        for i, gb_dico in enumerate(gbff_iter):
-            # print(gb_dico)
-            gb_file = gb_dico['gb_file']
-            genetic_code = gb_dico['genetic_code']
-
-            extractCleavageSites(gb_file,dico_file, genetic_code, gff_file, taxon_expectation, polyprotein_number)
-
-
-        print('Polyproteins extraction completed for taxon', taxon)
-
-
-        [ v.close() for k, v in dico_file.items() if k != 'prefix_file']
-        break
+    handle_poly.close()
+    handle_prot.close()
