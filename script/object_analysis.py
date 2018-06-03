@@ -10,7 +10,7 @@ from Bio.Alphabet import generic_protein
 from Bio.SeqFeature import SeqFeature, FeatureLocation
 from operator import attrgetter
 
-SCREEN_SIZE = 200
+SCREEN_SIZE = 140
 
 
 class Genome:
@@ -819,71 +819,71 @@ class Protein(Sequence):
         return string
 
 
-    def __contains__(self, seq):
+    def __contains__(self, pep):
         ##test if a peptide is in polyprotein
         # the qualifiers gene is no more used to know if a peptide belong to a polyprotein
         # Only the position of the peptide tel us if the peptide belongs to a poly
         # Start < end always. The coordinate are given according the strand of the gene
-        # pep = seq.bp_obj # extract biopython object of peptide objet
-        # seq_location = seq if not seq.__class__.__name__ ==  'Peptide' else seq.bp_obj.location
-        if not seq.__class__.__name__ ==  'Peptide':
-            logging.warning("the magic method from Porotein class is used by {}".format(seq.__class__.__name__))
+        if not pep.__class__.__name__ ==  'Peptide':
+            logging.warning("the magic method from Porotein class is used by {}".format(pep.__class__.__name__))
+            input()
 
-        poly = self.bp_obj
-        if not (seq.start in poly.location and seq.end in poly.location and seq.location.strand ==  poly.location.strand):
+
+        if not (pep.start in self.bp_obj.location and pep.end in self.bp_obj.location and pep.location.strand ==  self.bp_obj.location.strand):
             # print("direct F")
             return False
 
 
-        pep_parts = iter(seq.location.parts)
+        pep_parts = iter(pep.location.parts)
         pep_part = next(pep_parts)
         case2 = False
-        len_prot = 0
-        # print('---------------------------')
-        # print('PEPTIDE: ', seq.number, seq.location)
-        #
-        # print('Protein: ', self.number, poly.location)
+        shift = 0 # to check modulo of the peptide and the prot
+        previous_end = self.bp_obj.location.start
+        print('---------------------------')
+        print('PEPTIDE: ', pep.number, pep.location)
 
-        for sub_location in poly.location.parts:
-            len_prot += len(sub_location) # len prot: length of the protein from the first part to the i_part
-            modulo_check = sub_location.end - len_prot%3 # len_prot%3: correction to be always in the correct frame. modulo_check is always in a
+        print('Protein: ', self.number, self.bp_obj.location)
 
-            # print(sub_location)
-            # print('LEN',len(sub_location),"MODULO", len(sub_location)%3)
-            # print('\n==Protein Sub location==')
-            # print('pap part', pep_part)
-            # print('prot part', sub_location)
+        for sub_location in self.bp_obj.location.parts:
+            shift += sub_location.start - previous_end
+
+            print('\n==Protein Sub location==')
+            print("SHIFT", shift)
+            print('pap part', pep_part)
+            print('prot part', sub_location)
             if case2:
-                # print('\n-WE are in case 2', )
+                print('\n-WE are in case 2', )
 
                 if pep_part.start == sub_location.start: # check if the 2 parts start are the same. So if the join() is similar
-                    # print('--the start are the same')
-                    # print("--pep parts", pep_parts)
+                    print('--the start are the same')
+                    print("--pep parts", pep_parts)
                     try:
                         pep_part = next(pep_parts)
-                    except StopIteration:
-                        if seq.end in sub_location and seq.end%3 == len_prot - modulo_check%3: # No more part for the peptide and it end is included in the subprot prat
-                            # print('---end is included in the prot part')
-                            # print('TRUUE')
-                            return True
-                    else:
-                        # print('--We go to next part')
 
+                    except StopIteration:
+                         # No more part for the peptide and it end is included in the subprot prat
+                        return True if pep_part.end in sub_location else False
+
+                    else:
+                        print('--We go to next part')
                         continue
                 else: #The peptide in somehow not folowing the prot part
-                    # print('-The peptide in somehow not folowing the prot part')
-                    # print('FALSE')
+                    print('-The peptide in somehow not folowing the prot part')
+                    print('FALSE')
                     return False
+
+            print("pep.start%3", pep.start%3, "  | (pep_part.start+shift)%3",(pep_part.start+shift)%3 )
             # Case 1 : The peptide is included in one part of the protein
-            if seq.start in sub_location and seq.end in sub_location and  len(seq.location.parts) == 1 and seq.end%3 == modulo_prot%3:
-                # print("-the peptide is included in the subprot part")
+            if pep.start in sub_location and pep.end in sub_location and  len(pep.location.parts) == 1 and  pep.start%3 == (self.start+shift)%3:
+                print("-the peptide is included in the subprot part")
                 return True
 
             # Case 2 Peptide is overlapping this part with the next one
-            if seq.start in sub_location and seq.end not in sub_location and pep_part.end == sub_location.end:
+            if pep.start in sub_location and pep.end not in sub_location and pep_part.end == sub_location.end and pep.start%3 == (self.start+shift)%3:
                 pep_part = next(pep_parts)
                 case2 = True
-                # print('-the peptide is overlaping the prot part')
+                print('-the peptide is overlaping the prot part')
+            previous_end = sub_location.end
         return False
 
 

@@ -16,8 +16,8 @@ def visualisation(gb_file, genetic_code, gff_file, taxon_expectation, window_ste
 
     genome = obj.Genome( gb_file)
 
-    # with gzip.open(gb_file, "rt") as handle:
-    with open("test_genome.gbff", "rt") as handle:
+    with gzip.open(gb_file, "rt") as handle:
+    # with open("test_genome.gbff", "rt") as handle:
     # with open("/home/user/mainguy/Documents/Data_Analysis/GCF_000885175.1_ViralMultiSegProj39867_genomic_MODIFIED.gbff", "rt") as handle:
         for i, record in enumerate(SeqIO.parse(handle, "genbank")):
 
